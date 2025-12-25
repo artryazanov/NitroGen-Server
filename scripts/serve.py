@@ -62,7 +62,9 @@ def read_image_from_conn(conn):
             actual_width = width
             actual_height = abs(height)
             
-            pixel_data_size = actual_width * actual_height * 3
+            # BMP aligns rows to 4-byte boundaries
+            row_size = (actual_width * 3 + 3) & ~3
+            pixel_data_size = row_size * actual_height
             
             # Read pixels
             raw_data = b""
@@ -72,7 +74,13 @@ def read_image_from_conn(conn):
                 raw_data += chunk
             
             if len(raw_data) == pixel_data_size:
-                img = np.frombuffer(raw_data, dtype=np.uint8).reshape(actual_height, actual_width, 3)
+                img = np.frombuffer(raw_data, dtype=np.uint8)
+                
+                # If there is alignment padding, remove it
+                if row_size != actual_width * 3:
+                     img = img.reshape(actual_height, row_size)[:, :actual_width * 3]
+                
+                img = img.reshape(actual_height, actual_width, 3)
                 
                 if is_bottom_up:
                     img = cv2.flip(img, 0)

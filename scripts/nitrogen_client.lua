@@ -68,6 +68,10 @@ if not success then
     return
 end
 
+-- Set timeout to 500ms so the emulator doesn't hang if the server is "thinking"
+tcp.ReceiveTimeout = 500
+tcp.SendTimeout = 500
+
 console.log("Connected!")
 local stream = tcp:GetStream()
 local resp_buffer = luanet.import_type("System.Byte[]")(4096)
@@ -95,24 +99,27 @@ while tcp.Connected do
     end
     
     -- 5. Receive
-    local bytes_read = stream:Read(resp_buffer, 0, resp_buffer.Length)
-    if bytes_read > 0 then
-        local resp_str = Encoding.ASCII:GetString(resp_buffer, 0, bytes_read)
-        
-        local s, e = string.find(resp_str, "\"buttons\":%s*%[")
-        if e then
-            local end_bracket = string.find(resp_str, "%]", e)
-            if end_bracket then
-                local val_str = string.sub(resp_str, e+1, end_bracket-1)
-                apply_controls(val_str)
+    local read_ok, read_err = pcall(function()
+        local bytes_read = stream:Read(resp_buffer, 0, resp_buffer.Length)
+        if bytes_read > 0 then
+            local resp_str = Encoding.ASCII:GetString(resp_buffer, 0, bytes_read)
+            
+            local s, e = string.find(resp_str, "\"buttons\":%s*%[")
+            if e then
+                local end_bracket = string.find(resp_str, "%]", e)
+                if end_bracket then
+                    local val_str = string.sub(resp_str, e+1, end_bracket-1)
+                    apply_controls(val_str)
+                end
             end
+            
+            gui.drawText(0, 0, "AI Active", "green")
         end
-        
-        -- Optional Debug Text
-        gui.drawText(0, 0, "AI Active", "green")
-    else
-        console.log("Server sent empty response.")
-        break
+    end)
+
+    if not read_ok then
+        -- If timeout or error, just ignore and go to next frame
+        -- console.log("Timeout/Skip") 
     end
     
     emu.frameadvance()
