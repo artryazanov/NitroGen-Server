@@ -435,7 +435,7 @@ class NitroGen(torch.nn.Module):
 
         B, T = sa_token_ids.shape
         sa_embs = torch.full(
-            size=(B, T, self.hidden_size), fill_value=0.0, dtype=vision.dtype, device=vision.device
+            size=(B, T, self.hidden_size), fill_value=0.0, dtype=action.dtype, device=vision.device
         )
 
         # Project state.

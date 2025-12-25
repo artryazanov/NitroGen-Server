@@ -12,7 +12,7 @@ local Encoding = luanet.import_type("System.Text.Encoding")
 -- === CONFIGURATION ===
 local HOST = "127.0.0.1"
 local PORT = 5556
-local TEMP_IMG_FILE = "nitrogen_temp.bmp"
+local TEMP_IMG_FILE = "nitrogen_temp.png"
 local CONSOLE_TYPE = "NES" -- "SNES" or "NES"
 
 -- === CONTROL MAPPING ===
@@ -84,7 +84,9 @@ while tcp.Connected do
     local file_bytes = File.ReadAllBytes(TEMP_IMG_FILE)
     
     -- 3. Header
-    local json_header = '{"type": "predict"}\n'
+    local len = file_bytes.Length
+    console.log("Sending " .. len .. " bytes")
+    local json_header = string.format('{"type": "predict", "len": %d}\n', len)
     local header_bytes = Encoding.ASCII:GetBytes(json_header)
     
     -- 4. Send
@@ -119,7 +121,7 @@ while tcp.Connected do
 
     if not read_ok then
         -- If timeout or error, just ignore and go to next frame
-        -- console.log("Timeout/Skip") 
+        console.log("Timeout/Skip") 
     end
     
     emu.frameadvance()

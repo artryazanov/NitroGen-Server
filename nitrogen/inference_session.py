@@ -215,9 +215,9 @@ class InferenceSession:
 
         # Convert to list of action dicts
         n_actions = len(predicted_actions["buttons"])
-        j_left = predicted_actions["j_left"].squeeze().cpu().numpy()
-        j_right = predicted_actions["j_right"].squeeze().cpu().numpy()
-        buttons = predicted_actions["buttons"].squeeze().cpu().numpy()
+        j_left = predicted_actions["j_left"].squeeze().float().cpu().numpy()
+        j_right = predicted_actions["j_right"].squeeze().float().cpu().numpy()
+        buttons = predicted_actions["buttons"].squeeze().float().cpu().numpy()
 
         return {
             "j_left": j_left,
@@ -229,8 +229,8 @@ class InferenceSession:
 
         available_frames = len(self.obs_buffer)
         frames = torch.zeros((self.max_buffer_size, *pixel_values.shape[1:]), 
-                            dtype=pixel_values.dtype, device="cuda")
-        frames[-available_frames:] = pixel_values
+                            dtype=torch.bfloat16, device="cuda")
+        frames[-available_frames:] = pixel_values.to(dtype=torch.bfloat16)
         dropped_frames = torch.zeros((self.max_buffer_size,), dtype=torch.bool, device="cuda")
         dropped_frames[:self.max_buffer_size - available_frames] = True
         
@@ -250,15 +250,21 @@ class InferenceSession:
         }
         tokenized_data_without_history = self.tokenizer.encode(data_without_history)
         
-        # Convert to CUDA tensors with batch dimension
+        # Convert to CUDA tensors with batch dimension and enforce bfloat16
         for tokenized_data in [tokenized_data_with_history, tokenized_data_without_history]:
             for k, v in tokenized_data.items():
                 if isinstance(v, torch.Tensor):
-                    tokenized_data[k] = v.unsqueeze(0).to("cuda")
+                    v = v.unsqueeze(0).to("cuda")
                 elif isinstance(v, np.ndarray):
-                    tokenized_data[k] = torch.tensor(v, device="cuda").unsqueeze(0)
+                    v = torch.tensor(v, device="cuda").unsqueeze(0)
                 else:
                     tokenized_data[k] = [v]
+                    continue
+                
+                if v.is_floating_point():
+                    v = v.to(dtype=torch.bfloat16)
+                
+                tokenized_data[k] = v
         
         with torch.inference_mode():
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):

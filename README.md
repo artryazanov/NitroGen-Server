@@ -85,19 +85,22 @@ We provide a ready-to-use client script: [`scripts/nitrogen_client.lua`](scripts
 > This script uses native .NET libraries available in BizHawk on Windows. No external Lua libraries are required.
 
 #### Protocol Details
-The server now supports **Automatic Format Detection** on port **5556**. It handles both **BMP Files** (with headers) and **Raw Pixels**.
+The server now supports **Automatic Format Detection** on port **5556**. It handles **Any Image Format** (PNG, BMP, JPG) or **Raw Pixels**.
 
 Steps:
 1.  **Open Socket**: Connect to `<SERVER_IP>:5556`.
 2.  **Send Request**:
+    Send a JSON header terminated by `\n`. It is **highly recommended** to include the `len` field (file size in bytes) to ensure perfect synchronization.
+
     ```json
     {
-        "type": "predict"
+        "type": "predict",
+        "len": 12345
     }
     ```
 3.  **Send Image**:
-    *   **Option A (Recommended):** Send a standard **BMP file** (including header). The server automatically parses the header, detects orientation (Bottom-Up vs Top-Down), flips if necessary, and converts BGR to RGB.
-    *   **Option B (Advanced):** Send **196,608 bytes** of raw RGB pixel data (256x256). The server detects the lack of a BMP header and treats it as a raw buffer.
+    *   **Option A (Recommended):** Send a standard image file (PNG, BMP, JPG). The server uses `cv2.imdecode` to parse it automatically.
+    *   **Option B (Fallback):** Send **196,608 bytes** of raw RGB pixel data (256x256). If `len` matches exactly, it is treated as raw buffer.
 4.  **Receive Response**: Read the JSON response terminated by `\n`.
 
 _See `scripts/serve.py` for implementation details._

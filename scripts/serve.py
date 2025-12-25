@@ -1,4 +1,5 @@
 import zmq
+import time
 import argparse
 import pickle
 import struct
@@ -28,12 +29,42 @@ def handle_request(session, request, raw_image=None):
         return {"status": "error", "message": "Unknown type"}
 
 
-def read_image_from_conn(conn):
+def read_image_from_conn(conn, expected_size=None):
     """
     Reads an image from the connection.
-    Detects BMP format by checking for 'BM' signature.
-    Otherwise, assumes Raw RGB 256x256x3.
+    If expected_size is provided, reads exactly that many bytes.
+    Otherwise, detects BMP format by checking for 'BM' signature.
     """
+    if expected_size is not None:
+        raw_data = b""
+        while len(raw_data) < expected_size:
+            target = expected_size - len(raw_data)
+            chunk = conn.recv(target)
+            if not chunk: 
+                break
+            raw_data += chunk
+            
+        if len(raw_data) == expected_size:
+             # Try to decode as generic image (BMP, PNG, etc.) from memory
+             img = np.frombuffer(raw_data, dtype=np.uint8)
+             try:
+                 img = cv2.imdecode(img, cv2.IMREAD_COLOR) # Using opencv to decode buffer is safer/easier
+                 if img is not None:
+                     # OpenCV loads as BGR. 
+                     # We need RGB.
+                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                     if img.shape[0] != 256 or img.shape[1] != 256:
+                          img = cv2.resize(img, (256, 256), interpolation=cv2.INTER_AREA)
+                     return img
+             except Exception:
+                 pass
+                 
+             # Fallback: Assume Raw RGB 256x256x3
+             expected_raw = 256 * 256 * 3
+             if len(raw_data) == expected_raw:
+                  return np.frombuffer(raw_data, dtype=np.uint8).reshape(256, 256, 3).copy()
+        return None
+
     # 1. Peek/Read first 2 bytes to check for BMP signature 'BM'
     sig = b""
     while len(sig) < 2:
@@ -56,6 +87,9 @@ def read_image_from_conn(conn):
         
         # Parse BMP header
         try:
+            # File size is at offset 2 (4 bytes, little endian)
+            file_size = struct.unpack_from('<I', header_data, 2)[0]
+            
             width, height = struct.unpack_from('<ii', header_data, 18)
             
             is_bottom_up = height > 0
@@ -66,15 +100,36 @@ def read_image_from_conn(conn):
             row_size = (actual_width * 3 + 3) & ~3
             pixel_data_size = row_size * actual_height
             
-            # Read pixels
+            # Read pixels + any extra metadata/padding
+            # We already read 54 bytes (14 header + 40 info)
+            # WAIT: We read 'sig' (2) + 'rest_header' (52) = 54 bytes.
+            # So remaining is file_size - 54.
+            remaining_bytes = file_size - 54
+            
             raw_data = b""
-            while len(raw_data) < pixel_data_size:
-                chunk = conn.recv(pixel_data_size - len(raw_data))
+            while len(raw_data) < remaining_bytes:
+                chunk = conn.recv(remaining_bytes - len(raw_data))
                 if not chunk: break
                 raw_data += chunk
             
-            if len(raw_data) == pixel_data_size:
-                img = np.frombuffer(raw_data, dtype=np.uint8)
+            if len(raw_data) == remaining_bytes:
+                # We interpret the first 'pixel_data_size' bytes of raw_data as pixels
+                # (Assuming pixel offset is 54, which is standard for 24-bit BMP)
+                # Ideally we should read bfOffBits at offset 10 to be sure where pixels start.
+                bfOffBits = struct.unpack_from('<I', header_data, 10)[0]
+                
+                # The pixel data starts at bfOffBits - 54 (since we consumed 54)
+                pixel_start = bfOffBits - 54
+                
+                if pixel_start < 0 or pixel_start + pixel_data_size > len(raw_data):
+                     # Fallback or error?
+                     # If standard V3 header, offset is usually 54. 
+                     # If we have color table, offset > 54.
+                     pass 
+                
+                pixel_bytes = raw_data[pixel_start : pixel_start + pixel_data_size]
+                
+                img = np.frombuffer(pixel_bytes, dtype=np.uint8)
                 
                 # If there is alignment padding, remove it
                 if row_size != actual_width * 3:
@@ -118,7 +173,7 @@ def read_image_from_conn(conn):
         
     if len(raw_data) == expected_bytes:
         # Assume Raw is already RGB and correctly oriented (256x256)
-        return np.frombuffer(raw_data, dtype=np.uint8).reshape(256, 256, 3)
+        return np.frombuffer(raw_data, dtype=np.uint8).reshape(256, 256, 3).copy()
         
     return None
 
@@ -127,7 +182,7 @@ def run_zmq_server(session, port):
     context = zmq.Context()
     socket_zmq = context.socket(zmq.REP)
     socket_zmq.bind(f"tcp://*:{port}")
-    print(f"ZMQ Server running on port {port}")
+    print(f"ZMQ Server running on port {port}", flush=True)
     
     while True:
         try:
@@ -148,7 +203,7 @@ def run_tcp_server(session, port):
         return
 
     server.listen(1)
-    print(f"Simple TCP Server (JSON+Bytes) running on port {port}")
+    print(f"Simple TCP Server (JSON+Bytes) running on port {port}", flush=True)
     
     while True:
         conn, addr = server.accept()
@@ -177,7 +232,8 @@ def run_tcp_server(session, port):
 
                 img = None
                 if req.get("type") == "predict":
-                    img = read_image_from_conn(conn)
+                    expected_len = req.get("len")
+                    img = read_image_from_conn(conn, expected_size=expected_len)
                     if img is None:
                         print("Incomplete or invalid image data received")
                         break
@@ -192,7 +248,9 @@ def run_tcp_server(session, port):
                 response_json = json.dumps(res)
                 conn.sendall((response_json + "\n").encode('utf-8'))
         except Exception as e:
-            print(f"TCP Connection error: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"TCP Connection error: {e}", flush=True)
         finally:
             conn.close()
 
@@ -209,6 +267,7 @@ if __name__ == "__main__":
     # Start TCP server in a daemon thread
     tcp_thread = threading.Thread(target=run_tcp_server, args=(session, args.tcp_port), daemon=True)
     tcp_thread.start()
+    time.sleep(0.5)
 
     # Run ZMQ server in the main thread
     try:
