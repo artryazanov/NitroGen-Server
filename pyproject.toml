@@ -69,6 +69,11 @@ play = [
     "xspeedhack",
 ]
 
+test = [
+    "pytest",
+    "pytest-mock",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 exclude = ["scripts*"]
