@@ -83,17 +83,19 @@ We provide a ready-to-use client script: [`scripts/nitrogen_client.lua`](scripts
 3.  **Run**: In BizHawk, go to **Tools -> Lua Console -> Script -> Open Script** and select `scripts/nitrogen_client.lua`.
 
 #### Protocol Details
-If you develop your own client using standard BMP screenshots (which are typically Bottom-Up and BGR), use the `image_source` parameter:
+The server now supports **Automatic Format Detection** on port **5556**. It handles both **BMP Files** (with headers) and **Raw Pixels**.
 
+Steps:
 1.  **Open Socket**: Connect to `<SERVER_IP>:5556`.
 2.  **Send Request**:
     ```json
     {
-        "type": "predict",
-        "image_source": "bmp"
+        "type": "predict"
     }
     ```
-3.  **Send Image**: Immediately send **196,608 bytes** of raw pixel data (256x256). The server will automatically flip and convert colors if `image_source` is "bmp".
+3.  **Send Image**:
+    *   **Option A (Recommended):** Send a standard **BMP file** (including header). The server automatically parses the header, detects orientation (Bottom-Up vs Top-Down), flips if necessary, and converts BGR to RGB.
+    *   **Option B (Advanced):** Send **196,608 bytes** of raw RGB pixel data (256x256). The server detects the lack of a BMP header and treats it as a raw buffer.
 4.  **Receive Response**: Read the JSON response terminated by `\n`.
 
 _See `scripts/serve.py` for implementation details._

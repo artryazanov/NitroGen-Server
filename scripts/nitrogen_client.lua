@@ -8,7 +8,7 @@ local PORT = 5556 -- Port for TCP (Simple TCP Server)
 local TEMP_IMG_FILE = "nitrogen_temp.bmp"
 local TARGET_WIDTH = 256
 local TARGET_HEIGHT = 256
-local EXPECTED_BYTES = TARGET_WIDTH * TARGET_HEIGHT * 3
+local EXPECTED_BYTES = TARGET_WIDTH * TARGET_HEIGHT * 3 + 54 -- Include BMP Header
 local CONSOLE_TYPE = "NES" -- "SNES" or "NES"
 
 -- Button order (matches nitrogen/shared.py)
@@ -86,20 +86,18 @@ while true do
         local content = f:read("*all")
         f:close()
         
-        -- BMP Header is usually 54 bytes. The rest is pixels.
-        -- Note: BMP stores colors as BGR and is flipped vertically (Bottom-Up).
-        -- Server expects RGB. If the model behaves poorly, color correction might be needed on server.
-        local raw_pixels = string.sub(content, 55)
+        -- Send the full content (Header + Pixels)
+        -- The server will now parse the BMP header to determine orientation and size.
+        local raw_pixels = content
         
         local current_len = string.len(raw_pixels)
         
         -- Check size
         if current_len == EXPECTED_BYTES then
             -- 3. Send JSON header
-            -- Specify 'bmp' since we are sending raw bytes from a BMP file
+            -- image_source is no longer needed, server detects via BMP header or defaults
             local req = json.encode({
-                type = "predict",
-                image_source = "bmp" 
+                type = "predict"
             })
             tcp:send(req .. "\n")
             
@@ -125,8 +123,8 @@ while true do
             end
         else
             console.log("Error: Screenshot size mismatch!")
-            console.log("Expected: " .. EXPECTED_BYTES .. " bytes (256x256)")
-            console.log("Got: " .. current_len .. " bytes. Check Window Size!")
+            console.log("Expected: " .. EXPECTED_BYTES + 54 .. " bytes (including header)")
+            console.log("Got: " .. current_len .. " bytes.")
         end
     end
     

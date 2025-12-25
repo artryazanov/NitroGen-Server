@@ -1,6 +1,7 @@
 import zmq
 import argparse
 import pickle
+import struct
 import json
 import socket
 import numpy as np
@@ -26,16 +27,92 @@ def handle_request(session, request, raw_image=None):
             return {"status": "ok", "pred": result}
         return {"status": "error", "message": "Unknown type"}
 
-def process_raw_image(raw_data, image_source=None):
-    """Processes raw pixel data into a numpy array, handling specific formats."""
-    img = np.frombuffer(raw_data, dtype=np.uint8).reshape(256, 256, 3)
+
+def read_image_from_conn(conn):
+    """
+    Reads an image from the connection.
+    Detects BMP format by checking for 'BM' signature.
+    Otherwise, assumes Raw RGB 256x256x3.
+    """
+    # 1. Peek/Read first 2 bytes to check for BMP signature 'BM'
+    sig = b""
+    while len(sig) < 2:
+        chunk = conn.recv(2 - len(sig))
+        if not chunk: return None
+        sig += chunk
     
-    # Handle BizHawk BMP format (Bottom-Up, BGR)
-    if image_source == "bmp":
-        img = cv2.flip(img, 0)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    is_bmp = (sig == b'BM')
     
-    return img
+    # === BMP PATH ===
+    if is_bmp:
+        # Read next 52 bytes to complete 54-byte header
+        rest_header = b""
+        while len(rest_header) < 52:
+            chunk = conn.recv(52 - len(rest_header))
+            if not chunk: return None # Broken stream
+            rest_header += chunk
+        
+        header_data = sig + rest_header
+        
+        # Parse BMP header
+        try:
+            width, height = struct.unpack_from('<ii', header_data, 18)
+            
+            is_bottom_up = height > 0
+            actual_width = width
+            actual_height = abs(height)
+            
+            pixel_data_size = actual_width * actual_height * 3
+            
+            # Read pixels
+            raw_data = b""
+            while len(raw_data) < pixel_data_size:
+                chunk = conn.recv(pixel_data_size - len(raw_data))
+                if not chunk: break
+                raw_data += chunk
+            
+            if len(raw_data) == pixel_data_size:
+                img = np.frombuffer(raw_data, dtype=np.uint8).reshape(actual_height, actual_width, 3)
+                
+                if is_bottom_up:
+                    img = cv2.flip(img, 0)
+                
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                
+                if actual_width != 256 or actual_height != 256:
+                    img = cv2.resize(img, (256, 256), interpolation=cv2.INTER_AREA)
+                    
+                return img
+        except struct.error:
+            # Fallback to Raw if parsing fails? Unlikely if we got bytes.
+            pass
+
+    # === RAW PATH (Fallback or Non-BMP) ===
+    # If we are here, it wasn't a BMP or we decided to treat as raw.
+    # Note: If it WAS 'BM' but processing failed, we might have already consumed bytes.
+    # But for now, let's assume if it starts with BM it IS a BMP. 
+    # If signature was NOT BM, we have 2 bytes in 'sig'.
+    
+    if is_bmp:
+        # If we failed BMP parsing but determined it was BMP, return None. 
+        # (Mixed logic: 'BM' is strong indicator. If header is partial, connection is bad).
+        return None
+
+    # Raw expected size: 256x256x3 = 196608
+    expected_bytes = 256 * 256 * 3
+    
+    # We already have 'sig' (2 bytes)
+    raw_data = sig
+    while len(raw_data) < expected_bytes:
+        chunk = conn.recv(expected_bytes - len(raw_data))
+        if not chunk: break
+        raw_data += chunk
+        
+    if len(raw_data) == expected_bytes:
+        # Assume Raw is already RGB and correctly oriented (256x256)
+        return np.frombuffer(raw_data, dtype=np.uint8).reshape(256, 256, 3)
+        
+    return None
 
 def run_zmq_server(session, port):
     """Runs the ZeroMQ server (original protocol)."""
@@ -92,18 +169,9 @@ def run_tcp_server(session, port):
 
                 img = None
                 if req.get("type") == "predict":
-                    # 2. Read exactly 196608 pixel bytes (256x256x3)
-                    expected_bytes = 256 * 256 * 3
-                    raw_data = b""
-                    while len(raw_data) < expected_bytes:
-                        chunk = conn.recv(expected_bytes - len(raw_data))
-                        if not chunk: break
-                        raw_data += chunk
-                    
-                    if len(raw_data) == expected_bytes:
-                        img = process_raw_image(raw_data, req.get("image_source"))
-                    else:
-                        print("Incomplete image data received")
+                    img = read_image_from_conn(conn)
+                    if img is None:
+                        print("Incomplete or invalid image data received")
                         break
 
                 # 3. Process and send JSON response
