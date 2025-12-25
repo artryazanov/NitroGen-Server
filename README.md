@@ -1,6 +1,6 @@
 # NitroGen Server
 
-NitroGen is an open foundation model for generalist gaming agents. This repository hosts the inference server which can be easily deployed using Docker.
+NitroGen is an open foundation model for generalist gaming agents. The model weights are available on [Hugging Face](https://huggingface.co/nvidia/NitroGen). This repository hosts the inference server which can be easily deployed using Docker.
 
 For the original documentation, including manual installation steps and details on the client-side game agent, please refer to [README_ORIGINAL.md](README_ORIGINAL.md) or the [original repository](https://github.com/MineDojo/NitroGen).
 
