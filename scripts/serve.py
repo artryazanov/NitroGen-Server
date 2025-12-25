@@ -4,6 +4,7 @@ import pickle
 import json
 import socket
 import numpy as np
+import cv2
 import threading
 from nitrogen.inference_session import InferenceSession
 
@@ -24,6 +25,17 @@ def handle_request(session, request, raw_image=None):
             result = session.predict(image)
             return {"status": "ok", "pred": result}
         return {"status": "error", "message": "Unknown type"}
+
+def process_raw_image(raw_data, image_source=None):
+    """Processes raw pixel data into a numpy array, handling specific formats."""
+    img = np.frombuffer(raw_data, dtype=np.uint8).reshape(256, 256, 3)
+    
+    # Handle BizHawk BMP format (Bottom-Up, BGR)
+    if image_source == "bmp":
+        img = cv2.flip(img, 0)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    return img
 
 def run_zmq_server(session, port):
     """Runs the ZeroMQ server (original protocol)."""
@@ -89,8 +101,7 @@ def run_tcp_server(session, port):
                         raw_data += chunk
                     
                     if len(raw_data) == expected_bytes:
-                        # Convert bytes to numpy array for the model
-                        img = np.frombuffer(raw_data, dtype=np.uint8).reshape(256, 256, 3)
+                        img = process_raw_image(raw_data, req.get("image_source"))
                     else:
                         print("Incomplete image data received")
                         break

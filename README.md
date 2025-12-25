@@ -75,15 +75,28 @@ python scripts/play.py --process "celeste.exe" --ip <SERVER_IP> --port 5555
 ### BizHawk (Lua) Integration
 For emulators like BizHawk, use the TCP protocol on port **5556**.
 
+We provide a ready-to-use client script: [`scripts/nitrogen_client.lua`](scripts/nitrogen_client.lua).
+
+#### Setup
+1.  **Dependencies**: Download a JSON library for Lua (e.g., [json.lua](https://github.com/rxi/json.lua)) and place it in the same folder as the script.
+2.  **Configuration**: Open `scripts/nitrogen_client.lua` and adjust the button mapping in `apply_controls` to match your specific console/game.
+3.  **Run**: In BizHawk, go to **Tools -> Lua Console -> Script -> Open Script** and select `scripts/nitrogen_client.lua`.
+
+#### Protocol Details
+If you develop your own client using standard BMP screenshots (which are typically Bottom-Up and BGR), use the `image_source` parameter:
+
 1.  **Open Socket**: Connect to `<SERVER_IP>:5556`.
-2.  **Send Request**: Send a JSON string terminated by `\n`.
+2.  **Send Request**:
     ```json
-    {"type": "predict"}
+    {
+        "type": "predict",
+        "image_source": "bmp"
+    }
     ```
-3.  **Send Image**: Immediately send **196,608 bytes** of raw pixel data (256x256 RGB).
+3.  **Send Image**: Immediately send **196,608 bytes** of raw pixel data (256x256). The server will automatically flip and convert colors if `image_source` is "bmp".
 4.  **Receive Response**: Read the JSON response terminated by `\n`.
 
-_See `scripts/serve.py` for the implementation details._
+_See `scripts/serve.py` for implementation details._
 
 ---
 
