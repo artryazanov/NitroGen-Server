@@ -17,6 +17,7 @@ dependencies = [
     
     # Serve
     "torch",
+    "torchvision",
     "pyyaml",
     "einops",
     "transformers>=4.40.0",
@@ -43,6 +44,7 @@ serve = [
     "numpy",
     "pyzmq",
     "torch",
+    "torchvision",
     "pyyaml",
     "einops",
     "transformers",
