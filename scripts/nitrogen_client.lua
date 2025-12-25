@@ -1,135 +1,122 @@
--- Load required libraries
-local socket = require("socket")
-local json = require("json") -- Ensure json.lua is in the same directory
+-- NitroGen Client for BizHawk (Native .NET Version)
+-- FIX: Renamed 'client' variable to 'tcp' to avoid conflict with Emulator API
+
+local luanet = _G.luanet
+luanet.load_assembly("System")
+
+-- Imports
+local TcpClient = luanet.import_type("System.Net.Sockets.TcpClient")
+local File = luanet.import_type("System.IO.File") 
+local Encoding = luanet.import_type("System.Text.Encoding")
 
 -- === CONFIGURATION ===
 local HOST = "127.0.0.1"
-local PORT = 5556 -- Port for TCP (Simple TCP Server)
+local PORT = 5556
 local TEMP_IMG_FILE = "nitrogen_temp.bmp"
-local TARGET_WIDTH = 256
-local TARGET_HEIGHT = 256
-local EXPECTED_BYTES = TARGET_WIDTH * TARGET_HEIGHT * 3 + 54 -- Include BMP Header
 local CONSOLE_TYPE = "NES" -- "SNES" or "NES"
 
--- Button order (matches nitrogen/shared.py)
-local BUTTON_NAMES = {
-    "BACK", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT", "DPAD_UP", "EAST", "GUIDE", 
-    "LEFT_SHOULDER", "LEFT_THUMB", "LEFT_TRIGGER", "NORTH", "RIGHT_BOTTOM", "RIGHT_LEFT", 
-    "RIGHT_RIGHT", "RIGHT_SHOULDER", "RIGHT_THUMB", "RIGHT_TRIGGER", "RIGHT_UP", "SOUTH", 
-    "START", "WEST"
-}
-
 -- === CONTROL MAPPING ===
--- Configure this for your console (example for SNES)
--- NitroGen outputs: SOUTH=A, WEST=X, EAST=B, NORTH=Y (Xbox layout)
-local function apply_controls(pred)
+local function apply_controls(button_values)
     local joy = {}
-    local buttons = pred.buttons
+    local buttons = {}
     
-    -- Send to emulator
+    for v in string.gmatch(button_values, "[%d%.]+") do
+        table.insert(buttons, tonumber(v))
+    end
+    
+    if #buttons < 21 then return end
+
     if CONSOLE_TYPE == "SNES" then
-        -- Example for SNES (Controller 1)
-        joy["P1 B"]      = buttons[6]  > 0.5 -- EAST -> B
-        joy["P1 A"]      = buttons[19] > 0.5 -- SOUTH -> A
-        joy["P1 Y"]      = buttons[21] > 0.5 -- WEST  -> Y
-        joy["P1 X"]      = buttons[11] > 0.5 -- NORTH -> X
-        
-        joy["P1 Up"]     = buttons[5]  > 0.5 -- DPAD_UP
-        joy["P1 Down"]   = buttons[2]  > 0.5 -- DPAD_DOWN
-        joy["P1 Left"]   = buttons[3]  > 0.5 -- DPAD_LEFT
-        joy["P1 Right"]  = buttons[4]  > 0.5 -- DPAD_RIGHT
-        
-        joy["P1 Start"]  = buttons[20] > 0.5 -- START
-        joy["P1 Select"] = buttons[1]  > 0.5 -- BACK -> Select
-        
-        joy["P1 L"]      = buttons[8]  > 0.5 -- LEFT_SHOULDER
-        joy["P1 R"]      = buttons[15] > 0.5 -- RIGHT_SHOULDER
+        joy["P1 B"]      = buttons[6]  > 0.5 
+        joy["P1 A"]      = buttons[19] > 0.5 
+        joy["P1 Y"]      = buttons[21] > 0.5 
+        joy["P1 X"]      = buttons[11] > 0.5 
+        joy["P1 Up"]     = buttons[5]  > 0.5 
+        joy["P1 Down"]   = buttons[2]  > 0.5 
+        joy["P1 Left"]   = buttons[3]  > 0.5 
+        joy["P1 Right"]  = buttons[4]  > 0.5 
+        joy["P1 Start"]  = buttons[20] > 0.5 
+        joy["P1 Select"] = buttons[1]  > 0.5 
+        joy["P1 L"]      = buttons[8]  > 0.5 
+        joy["P1 R"]      = buttons[15] > 0.5 
     elseif CONSOLE_TYPE == "NES" then
-        -- Example for NES (Controller 1)
-        joy["P1 A"]      = buttons[19] > 0.5 -- SOUTH -> A
-        joy["P1 B"]      = buttons[6]  > 0.5 -- EAST -> B
-        
-        joy["P1 Up"]     = buttons[5]  > 0.5 -- DPAD_UP
-        joy["P1 Down"]   = buttons[2]  > 0.5 -- DPAD_DOWN
-        joy["P1 Left"]   = buttons[3]  > 0.5 -- DPAD_LEFT
-        joy["P1 Right"]  = buttons[4]  > 0.5 -- DPAD_RIGHT
-        
-        joy["P1 Start"]  = buttons[20] > 0.5 -- START
-        joy["P1 Select"] = buttons[1]  > 0.5 -- BACK -> Select
+        joy["P1 A"]      = buttons[19] > 0.5 
+        joy["P1 B"]      = buttons[6]  > 0.5 
+        joy["P1 Up"]     = buttons[5]  > 0.5 
+        joy["P1 Down"]   = buttons[2]  > 0.5 
+        joy["P1 Left"]   = buttons[3]  > 0.5 
+        joy["P1 Right"]  = buttons[4]  > 0.5 
+        joy["P1 Start"]  = buttons[20] > 0.5 
+        joy["P1 Select"] = buttons[1]  > 0.5 
     end
     
     joypad.set(joy)
 end
 
--- === NETWORK FUNCTIONS ===
+-- === MAIN LOGIC ===
+console.clear()
+console.log("Connecting to " .. HOST .. ":" .. PORT .. "...")
 
-local tcp = socket.tcp()
-tcp:settimeout(2000) -- Timeout 2 sec
+-- FIX: Rename variable to 'tcp' so we don't hide global 'client'
+local tcp = TcpClient()
+local success, err = pcall(function() 
+    tcp:Connect(HOST, PORT) 
+end)
 
-console.log("Connecting to Nitrogen Server " .. HOST .. ":" .. PORT .. "...")
-local res, err = tcp:connect(HOST, PORT)
-if not res then
-    console.log("Error connecting: " .. err)
+if not success then
+    console.log("Connection Failed: " .. tostring(err))
     return
 end
-tcp:setoption("tcp-nodelay", true)
-console.log("Connected!")
 
--- Main loop
-while true do
-    -- 1. Take screenshot in BMP (faster than PNG and uncompressed)
+console.log("Connected!")
+local stream = tcp:GetStream()
+local resp_buffer = luanet.import_type("System.Byte[]")(4096)
+
+while tcp.Connected do
+    -- 1. Screenshot (Now 'client' refers to BizHawk API correctly)
     client.screenshot(TEMP_IMG_FILE)
     
-    -- 2. Read file as binary
-    local f = io.open(TEMP_IMG_FILE, "rb")
-    if f then
-        local content = f:read("*all")
-        f:close()
-        
-        -- Send the full content (Header + Pixels)
-        -- The server will now parse the BMP header to determine orientation and size.
-        local raw_pixels = content
-        
-        local current_len = string.len(raw_pixels)
-        
-        -- Check size
-        if current_len == EXPECTED_BYTES then
-            -- 3. Send JSON header
-            -- image_source is no longer needed, server detects via BMP header or defaults
-            local req = json.encode({
-                type = "predict"
-            })
-            tcp:send(req .. "\n")
-            
-            -- 4. Send pixels
-            tcp:send(raw_pixels)
-            
-            -- 5. Wait for response (JSON string)
-            local line, err = tcp:receive("*l")
-            if line then
-                local response = json.decode(line)
-                if response.status == "ok" then
-                    apply_controls(response.pred)
-                    
-                    -- Visualization (optional)
-                    gui.cleartext()
-                    gui.text(0, 0, "AI Active")
-                else
-                    console.log("Server error: " .. (response.message or "unknown"))
-                end
-            else
-                console.log("Connection lost: " .. (err or "unknown"))
-                break
-            end
-        else
-            console.log("Error: Screenshot size mismatch!")
-            console.log("Expected: " .. EXPECTED_BYTES + 54 .. " bytes (including header)")
-            console.log("Got: " .. current_len .. " bytes.")
-        end
+    -- 2. Read Bytes (Fast .NET read)
+    local file_bytes = File.ReadAllBytes(TEMP_IMG_FILE)
+    
+    -- 3. Header
+    local json_header = '{"type": "predict"}\n'
+    local header_bytes = Encoding.ASCII:GetBytes(json_header)
+    
+    -- 4. Send
+    local send_ok, send_err = pcall(function()
+        stream:Write(header_bytes, 0, header_bytes.Length)
+        stream:Write(file_bytes, 0, file_bytes.Length)
+    end)
+    
+    if not send_ok then
+        console.log("Error sending data.")
+        break
     end
     
-    -- Advance frame
+    -- 5. Receive
+    local bytes_read = stream:Read(resp_buffer, 0, resp_buffer.Length)
+    if bytes_read > 0 then
+        local resp_str = Encoding.ASCII:GetString(resp_buffer, 0, bytes_read)
+        
+        local s, e = string.find(resp_str, "\"buttons\":%s*%[")
+        if e then
+            local end_bracket = string.find(resp_str, "%]", e)
+            if end_bracket then
+                local val_str = string.sub(resp_str, e+1, end_bracket-1)
+                apply_controls(val_str)
+            end
+        end
+        
+        -- Optional Debug Text
+        gui.drawText(0, 0, "AI Active", "green")
+    else
+        console.log("Server sent empty response.")
+        break
+    end
+    
     emu.frameadvance()
 end
 
-tcp:close()
+tcp:Close()
+console.log("Disconnected.")

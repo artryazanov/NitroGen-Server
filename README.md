@@ -78,9 +78,11 @@ For emulators like BizHawk, use the TCP protocol on port **5556**.
 We provide a ready-to-use client script: [`scripts/nitrogen_client.lua`](scripts/nitrogen_client.lua).
 
 #### Setup
-1.  **Dependencies**: Download a JSON library for Lua (e.g., [json.lua](https://github.com/rxi/json.lua)) and place it in the same folder as the script.
-2.  **Configuration**: Open `scripts/nitrogen_client.lua` and adjust the button mapping in `apply_controls` to match your specific console/game.
-3.  **Run**: In BizHawk, go to **Tools -> Lua Console -> Script -> Open Script** and select `scripts/nitrogen_client.lua`.
+1.  **Configuration**: Open `scripts/nitrogen_client.lua` and adjust the button mapping in `apply_controls` to match your specific console/game.
+2.  **Run**: In BizHawk, go to **Tools -> Lua Console -> Script -> Open Script** and select `scripts/nitrogen_client.lua`.
+
+> [!NOTE]
+> This script uses native .NET libraries available in BizHawk on Windows. No external Lua libraries are required.
 
 #### Protocol Details
 The server now supports **Automatic Format Detection** on port **5556**. It handles both **BMP Files** (with headers) and **Raw Pixels**.
