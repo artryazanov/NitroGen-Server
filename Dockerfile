@@ -40,8 +40,8 @@ RUN chmod +x /app/scripts/start.sh
 # Ensure start script is executable
 RUN chmod +x /app/scripts/start.sh
 
-# Expose the default port
-EXPOSE 5555
+# Expose the default ports
+EXPOSE 5555 5556
 
 # Define volume for models
 VOLUME /app/models/nvidia/NitroGen

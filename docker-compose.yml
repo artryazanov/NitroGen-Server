@@ -3,6 +3,7 @@ services:
     build: .
     ports:
       - "5555:5555"
+      - "5556:5556"
     volumes:
       # Map the local models directory to the container's model directory
       # This ensures the downloaded model persists and is accessible externally

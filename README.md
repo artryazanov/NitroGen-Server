@@ -52,6 +52,25 @@ This ensures that the large model checkpoint is stored on your host machine and 
 ### Ports
 - **5555**: The ZeroMQ server port. You can change this in `docker-compose.yml` if needed.
 
+
+## Client Integration
+
+The server runs two protocols simultaneously:
+
+1.  **ZeroMQ + Pickle**: Port **5555** (Default/Python clients).
+2.  **TCP + JSON + Raw Bytes**: Port **5556** (BizHawk/Lua).
+
+### Using with BizHawk (Lua)
+
+Simply connect your Lua script/client to **port 5556** using a standard TCP socket. No special server configuration is needed.
+
+### BizHawk / Lua Protocol Details
+
+-   **Connect**: TCP to port 5556.
+-   **Request**: Send a JSON string terminated by `\n`, e.g., `{"type": "predict"}\n`.
+-   **Data**: Immediately send 196,608 bytes of raw pixel data (256x256 RGB).
+-   **Response**: The server answers with a JSON string containing the prediction.
+
 ## Connecting a Client
 
 Once the server is running (usually on a Linux machine with a powerful GPU), you can connect to it from your Windows gaming machine using `scripts/play.py`.
@@ -60,6 +79,7 @@ Ensure your client machine can reach the server's IP address on port 5555.
 
 ```bash
 # On your Windows machine (Client)
+# Uses ZMQ on port 5555 by default
 python scripts/play.py --process '<game_executable_name>.exe' --ip <SERVER_IP> --port 5555
 ```
 
