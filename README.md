@@ -37,7 +37,7 @@ cd NitroGen-Server
 docker-compose up --build
 ```
 
-**On the first run**, the server will automatically download the ~7GB model checkpoint. This may take a few minutes.
+**On the first run**, the server will automatically download the ~2GB model checkpoint. This may take a few minutes.
 Once ready, you will see:
 ```text
 ZMQ Server running on port 5555
