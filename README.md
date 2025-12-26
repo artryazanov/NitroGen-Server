@@ -62,7 +62,7 @@ The server exposes two ports by default:
 | Protocol | Port | Description | Target Use Case |
 | :--- | :--- | :--- | :--- |
 | **ZeroMQ** | `5555` | Serialized Python objects (Pickle) | **Python Clients** (e.g., `scripts/play.py`) |
-| **TCP/JSON** | `5556` | JSON Header + Raw Bytes | **BizHawk / Emulators** / Non-Python |
+| **TCP/JSON** | `5556` | JSON Header + Image (BMP/PNG) or Raw Bytes | **BizHawk / Emulators** / Non-Python |
 
 ### Python Client Example
 We provide a `play.py` script to connect a game running on a Windows client to the Linux server.
