@@ -77,12 +77,10 @@ For emulators like BizHawk, use the TCP protocol on port **5556**.
 
 We provide a ready-to-use client script in a separate repository: [NitroGen BizHawk AI Agent](https://github.com/artryazanov/nitrogen-bizhawk-ai-agent).
 
-You can download the script directly here: [`bizhawk_ai_agent.lua`](https://github.com/artryazanov/nitrogen-bizhawk-ai-agent/blob/main/bizhawk_ai_agent.lua).
-
 Please refer to the [repository documentation](https://github.com/artryazanov/nitrogen-bizhawk-ai-agent#readme) for setup and usage instructions.
 
 #### Protocol Details
-The server now supports **Automatic Format Detection** on port **5556**. It handles **Any Image Format** (PNG, BMP, JPG) or **Raw Pixels**.
+The server supports **Automatic Format Detection** on port **5556**. It handles **Any Image Format** (PNG, BMP, JPG) or **Raw Pixels**.
 
 Steps:
 1.  **Open Socket**: Connect to `<SERVER_IP>:5556`.
