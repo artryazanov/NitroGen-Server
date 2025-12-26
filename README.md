@@ -100,8 +100,6 @@ Steps:
     *   **Option B (Fallback):** Send **196,608 bytes** of raw RGB pixel data (256x256). If `len` matches exactly, it is treated as raw buffer.
 4.  **Receive Response**: Read the JSON response terminated by `\n`.
 
-_See `scripts/serve.py` for implementation details._
-
 ---
 
 ## 🛠 Manual Installation (Development)
@@ -111,9 +109,11 @@ If you prefer to run the server without Docker (e.g., for development):
 ```bash
 # 1. Install dependencies
 pip install -e .[serve]
+pip install "huggingface_hub[cli]"
 
-# 2. Download Model (Automatic on first run, but you can pre-download)
-# The server looks for models in ./models/nvidia/NitroGen/ng.pt
+# 2. Download Model
+# The server requires the model weights (~2GB) to be downloaded locally.
+huggingface-cli download nvidia/NitroGen ng.pt --local-dir models/nvidia/NitroGen
 
 # 3. Run Server
 python scripts/serve.py models/nvidia/NitroGen/ng.pt
