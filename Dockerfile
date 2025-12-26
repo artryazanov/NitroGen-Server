@@ -37,8 +37,6 @@ RUN pip install --upgrade pip && \
 # Ensure start script is executable
 RUN chmod +x /app/scripts/start.sh
 
-
-
 # Expose the default ports
 EXPOSE 5555 5556
 
