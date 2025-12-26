@@ -91,8 +91,17 @@ Steps:
     {
         "type": "predict",
         "len": 12345
+    {
+        "type": "predict",
+        "len": 12345,
+        "resize_mode": "pad"
     }
     ```
+    
+    **Resize Modes (`resize_mode`):**
+    *   `pad` (Default): Pads the image with black borders to preserve aspect ratio (adds bars), then resizes to 256x256.
+    *   `crop`: Center-crops a square from the image, then resizes to 256x256.
+    *   `stretch`: Stretches the image to fit 256x256 (may distort aspect ratio).
 3.  **Send Image**:
     *   **Option A (Recommended):** Send a standard image file (PNG, BMP, JPG). The server uses `cv2.imdecode` to parse it automatically.
     *   **Option B (Fallback):** Send **196,608 bytes** of raw RGB pixel data (256x256). If `len` matches exactly, it is treated as raw buffer.

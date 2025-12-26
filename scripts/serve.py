@@ -13,6 +13,60 @@ from nitrogen.inference_session import InferenceSession
 # Lock to ensure thread safety for the stateful InferenceSession
 session_lock = threading.Lock()
 
+def preprocess_image(img, mode="pad"):
+    """
+    Resizes image to 256x256 based on the mode:
+    - stretch: simple resize (default old behavior)
+    - crop: center crop to square, then resize
+    - pad: pad with black to square, then resize (default new behavior)
+    """
+    target_size = (256, 256)
+    # Check if image is valid
+    if img is None:
+        return None
+        
+    h, w = img.shape[:2]
+
+    if mode == "stretch":
+        if (w, h) != target_size:
+            return cv2.resize(img, target_size, interpolation=cv2.INTER_AREA)
+        return img
+
+    elif mode == "crop":
+        min_dim = min(h, w)
+        if h != w:
+            center_h, center_w = h // 2, w // 2
+            half_dim = min_dim // 2
+            start_h = max(0, center_h - half_dim)
+            start_w = max(0, center_w - half_dim)
+            end_h = start_h + min_dim
+            end_w = start_w + min_dim
+            img = img[start_h:end_h, start_w:end_w]
+        
+        if img.shape[:2] != (256, 256):
+             return cv2.resize(img, target_size, interpolation=cv2.INTER_AREA)
+        return img
+
+    elif mode == "pad":
+        max_dim = max(h, w)
+        if h != w:
+            top = (max_dim - h) // 2
+            bottom = max_dim - h - top
+            left = (max_dim - w) // 2
+            right = max_dim - w - left
+            img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+        
+        if img.shape[:2] != (256, 256):
+             return cv2.resize(img, target_size, interpolation=cv2.INTER_AREA)
+        return img
+    
+    # Fallback to pad if unknown mode
+    if h != w:
+        return preprocess_image(img, "pad")
+    if img.shape[:2] != target_size:
+        return cv2.resize(img, target_size, interpolation=cv2.INTER_AREA)
+    return img
+
 def handle_request(session, request, raw_image=None):
     """Universal request handler for ZeroMQ+Pickle and TCP+JSON+RawBytes protocols."""
     with session_lock:
@@ -29,7 +83,7 @@ def handle_request(session, request, raw_image=None):
         return {"status": "error", "message": "Unknown type"}
 
 
-def read_image_from_conn(conn, expected_size=None):
+def read_image_from_conn(conn, expected_size=None, resize_mode='pad'):
     """
     Reads an image from the connection.
     If expected_size is provided, reads exactly that many bytes.
@@ -53,8 +107,7 @@ def read_image_from_conn(conn, expected_size=None):
                      # OpenCV loads as BGR. 
                      # We need RGB.
                      img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                     if img.shape[0] != 256 or img.shape[1] != 256:
-                          img = cv2.resize(img, (256, 256), interpolation=cv2.INTER_AREA)
+                     img = preprocess_image(img, resize_mode)
                      return img
              except Exception:
                  pass
@@ -143,7 +196,7 @@ def read_image_from_conn(conn, expected_size=None):
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
                 if actual_width != 256 or actual_height != 256:
-                    img = cv2.resize(img, (256, 256), interpolation=cv2.INTER_AREA)
+                    img = preprocess_image(img, resize_mode)
                     
                 return img
         except struct.error:
@@ -233,7 +286,8 @@ def run_tcp_server(session, port):
                 img = None
                 if req.get("type") == "predict":
                     expected_len = req.get("len")
-                    img = read_image_from_conn(conn, expected_size=expected_len)
+                    resize_mode = req.get("resize_mode", "pad")
+                    img = read_image_from_conn(conn, expected_size=expected_len, resize_mode=resize_mode)
                     if img is None:
                         print("Incomplete or invalid image data received")
                         break
