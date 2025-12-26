@@ -75,14 +75,11 @@ python scripts/play.py --process "celeste.exe" --ip <SERVER_IP> --port 5555
 ### BizHawk (Lua) Integration
 For emulators like BizHawk, use the TCP protocol on port **5556**.
 
-We provide a ready-to-use client script: [`scripts/nitrogen_client.lua`](scripts/nitrogen_client.lua).
+We provide a ready-to-use client script: [`scripts/bizhawk_ai_agent.lua`](scripts/bizhawk_ai_agent.lua).
 
 #### Setup
-1.  **Configuration**: Open `scripts/nitrogen_client.lua` and adjust the button mapping in `apply_controls` to match your specific console/game.
-2.  **Run**: In BizHawk, go to **Tools -> Lua Console -> Script -> Open Script** and select `scripts/nitrogen_client.lua`.
-
-> [!NOTE]
-> This script uses native .NET libraries available in BizHawk on Windows. No external Lua libraries are required.
+1.  **Configuration**: Open `scripts/bizhawk_ai_agent.lua` and adjust the button mapping in `apply_controls` to match your specific console/game.
+2.  **Run**: In BizHawk, go to **Tools -> Lua Console -> Script -> Open Script** and select `scripts/bizhawk_ai_agent.lua`.
 
 #### Protocol Details
 The server now supports **Automatic Format Detection** on port **5556**. It handles **Any Image Format** (PNG, BMP, JPG) or **Raw Pixels**.

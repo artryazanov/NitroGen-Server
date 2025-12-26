@@ -1,5 +1,4 @@
--- NitroGen Client for BizHawk (Native .NET Version)
--- FIX: Renamed 'client' variable to 'tcp' to avoid conflict with Emulator API
+-- NitroGen AI Agent for BizHawk
 
 local luanet = _G.luanet
 luanet.load_assembly("System")
