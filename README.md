@@ -29,7 +29,7 @@ This is the recommended way to run the server.
 
 ### Prerequisites
 
-*   Linux Host with an NVIDIA GPU
+*   Host with an NVIDIA GPU (Linux or Windows)
 *   [Docker](https://docs.docker.com/engine/install/) & Docker Compose
 *   [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) (required for GPU access)
 
@@ -65,7 +65,7 @@ The server exposes two ports by default:
 | **TCP/JSON** | `5556` | JSON Header + Image (BMP/PNG) or Raw Bytes | **BizHawk / Emulators** / Non-Python |
 
 ### Python Client Example
-We provide a `play.py` script to connect a game running on a Windows client to the Linux server.
+We provide a `play.py` script to connect a game running on a client (e.g. Windows) to the NitroGen server.
 
 ```bash
 # On your Windows Gaming Machine
